@@ -1,4 +1,8 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -7,6 +11,8 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography.Xml;
 using System.Text;
+using Tweetbook.Authorization;
+using Tweetbook.Filters;
 using Tweetbook.Options;
 using Tweetbook.Services;
 
@@ -22,7 +28,14 @@ namespace Tweetbook.Installers
 
             services.AddScoped<IIdentityService, IdentityService>();
 
-            services.AddMvc(options => { options.EnableEndpointRouting = false; }).SetCompatibilityVersion(Microsoft.AspNetCore.Mvc.CompatibilityVersion.Version_3_0);
+            services
+                .AddMvc(options => 
+                { 
+                    options.EnableEndpointRouting = false;
+                    options.Filters.Add<ValidationFilter>();
+                })
+                .AddFluentValidation(mvcConfig => mvcConfig.RegisterValidatorsFromAssemblyContaining<Startup>())
+                .SetCompatibilityVersion(Microsoft.AspNetCore.Mvc.CompatibilityVersion.Version_3_0);
 
             var tokenValidationParameters = new TokenValidationParameters
             {
@@ -32,7 +45,6 @@ namespace Tweetbook.Installers
                 RequireExpirationTime = false,
                 ValidateLifetime = true,
                 ValidateIssuer = false,
-                ClockSkew = TimeSpan.Zero
             };
 
             services.AddSingleton(tokenValidationParameters);
@@ -51,29 +63,25 @@ namespace Tweetbook.Installers
 
             services.AddAuthorization(options =>
             {
-                options.AddPolicy("TagViewer", builder => builder.RequireClaim("tags.view", "true"));
-            });
+                options.AddPolicy("MustWorkForCompanyName", policy =>
+                {
+                    //policy.RequireRole("Admin");
+                    policy.AddRequirements(new WorksForCompanyRequirement("example.com"));
+                });
+                //options.AddPolicy("TagViewer", builder =>
+                //{
+                //    builder.RequireClaim("tags.view", "true");
+                //});
+            }
+            );
 
-            services.AddSwaggerGen(x =>
+            services.AddSingleton<IAuthorizationHandler, WorksForCompanyHandler>();
+            services.AddSingleton<IUriService>(provider =>
             {
-                x.SwaggerDoc("v1", new OpenApiInfo { Title = "Tweetbook API", Version = "v1" });
-
-                x.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-                {
-                    Description = "JWT Authorization header using the bearer scheme",
-                    Name = "Authorization",
-                    In = ParameterLocation.Header,
-                    Type = SecuritySchemeType.ApiKey
-                });
-
-                x.AddSecurityRequirement(new OpenApiSecurityRequirement
-                {
-                    {new OpenApiSecurityScheme{Reference = new OpenApiReference
-                    {
-                        Id = "Bearer",
-                        Type = ReferenceType.SecurityScheme
-                    }}, new List<string>() }
-                });
+                var accessor = provider.GetRequiredService<IHttpContextAccessor>();
+                var request = accessor.HttpContext.Request;
+                var absoluteUri = string.Concat(request.Scheme, "://", request.Host.ToUriComponent(), "/");
+                return new UriService(absoluteUri);
             });
         }
     }

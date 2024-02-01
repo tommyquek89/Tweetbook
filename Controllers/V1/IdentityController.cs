@@ -9,6 +9,9 @@ using Tweetbook.Services;
 
 namespace Tweetbook.Controllers.V1
 {
+    [ProducesResponseType(typeof(AuthSuccessResponse), 200)]
+    [ProducesResponseType(typeof(AuthFailedResponse), 400)]
+    [Produces("application/json")]
     public class IdentityController : Controller
     {
         private readonly IIdentityService _identityService;

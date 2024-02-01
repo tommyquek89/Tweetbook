@@ -7,7 +7,7 @@ namespace Tweetbook.Services
 {
     public interface IPostService
     {
-        Task<List<Post>> GetPostsAsync();
+        Task<List<Post>> GetPostsAsync(GetAllPostsFilter filter = null, PaginationFilter paginationFilter = null);
 
         Task<Post> GetPostByIdAsync(Guid postId);
 
@@ -20,5 +20,11 @@ namespace Tweetbook.Services
         Task<bool> UserOwnsPostAsync(Guid postId, string getUserId);
 
         Task<List<Tag>> GetAllTagsAsync();
+
+        Task<Tag> GetTagByNameAsync(string tagName);
+
+        Task<bool> CreateTagAsync(Tag tag);
+
+        Task<bool> DeleteTagAsync(string tagName);
     }
 }
